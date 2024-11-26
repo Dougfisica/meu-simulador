@@ -1,3 +1,6 @@
+"use client"; // Adicione esta linha no topo do arquivo
+
+// Resto do código do componente permanece o mesmo...
 import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Info, Ruler, ArrowRightCircle, RefreshCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
