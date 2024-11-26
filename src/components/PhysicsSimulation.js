@@ -269,4 +269,4 @@ const PhysicsSimulation = () => {
 };
 
 
-export default MotionSimulator;
+export default PhysicsSimulation;
