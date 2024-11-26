@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import PhysicsSimulation from '@/components/MotionSimulator';
+import PhysicsSimulation from '@/components/PhysicsSimulation';
 
 export default function PhysicsPage() {
   return (
