@@ -1,286 +1,272 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BarChart, Info, Ruler, ArrowRightCircle, RefreshCcw } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Card } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { PlayCircle, StopCircle, RotateCcw } from 'lucide-react';
 
-const MotionSimulator = () => {
+const PhysicsSimulation = () => {
   const [x0, setX0] = useState(0);
   const [v0, setV0] = useState(10);
-  const [a, setA] = useState(0);
+  const [a, setA] = useState(2);
+  const [laps, setLaps] = useState(3);
   const [isRunning, setIsRunning] = useState(false);
   const [time, setTime] = useState(0);
-  const [distance, setDistance] = useState(0);
-  const [velocity, setVelocity] = useState(0);
+  const [position, setPosition] = useState(0);
   const [data, setData] = useState([]);
-  const [view, setView] = useState('track');
   
-  const canvasRef = useRef(null);
-  const animationRef = useRef(null);
-  const startTimeRef = useRef(null);
-  // Crie refs para x0, v0 e a
-  const x0Ref = useRef(x0);
-  const v0Ref = useRef(v0);
-  const aRef = useRef(a);
-
-  // Atualize os refs quando os estados mudarem
-  useEffect(() => {
-    x0Ref.current = x0;
-  }, [x0]);
-
-  useEffect(() => {
-    v0Ref.current = v0;
-  }, [v0]);
-
-  useEffect(() => {
-    aRef.current = a;
-  }, [a]);
-
-  // Modifique as funções de cálculo para usar os refs
-  const calculatePosition = (t) => x0Ref.current + v0Ref.current * t + 0.5 * aRef.current * t * t;
-  const calculateVelocity = (t) => v0Ref.current + aRef.current * t;
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    
-    // Desenhar pista
-    const drawTrack = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Pista oval
-      ctx.beginPath();
-      ctx.ellipse(200, 150, 180, 100, 0, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 20;
-      ctx.stroke();
-      
-      // Linha de partida
-      ctx.beginPath();
-      ctx.moveTo(200, 50);
-      ctx.lineTo(200, 250);
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    };
-    
-    // Desenhar carro
-    const drawCar = (position) => {
-      const trackLength = 1000;
-      const normalizedPos = position % trackLength;
-      const angle = (normalizedPos / trackLength) * 2 * Math.PI;
-      
-      const carX = 200 + Math.cos(angle) * 180;
-      const carY = 150 + Math.sin(angle) * 100;
-      
-      ctx.beginPath();
-      ctx.arc(carX, carY, 10, 0, 2 * Math.PI);
-      ctx.fillStyle = '#ef4444';
-      ctx.fill();
-    };
-    
-    drawTrack();
-    if (isRunning) {
-      drawCar(distance);
-    } else {
-      drawCar(x0);
-    }
-  }, [isRunning, distance, x0]);
-
+  const animationFrameId = useRef(null);
+  const startTime = useRef(null);
+  const trackLength = 400;
+  
+  const calculatePosition = (t) => {
+    let x = x0 + v0 * t + (0.5 * a * t * t);
+    return x % trackLength;
+  }
+  
+  const calculateVelocity = (t) => {
+    return v0 + a * t;
+  }
+  
   const animate = (timestamp) => {
-    if (!startTimeRef.current) {
-      startTimeRef.current = timestamp;
-    }
+    if (!startTime.current) startTime.current = timestamp;
+    const progress = (timestamp - startTime.current) / 1000;
     
-    const elapsedTime = (timestamp - startTimeRef.current) / 1000;
-    const newPosition = calculatePosition(elapsedTime);
-    const newVelocity = calculateVelocity(elapsedTime);
+    const currentPosition = calculatePosition(progress);
+    const currentVelocity = calculateVelocity(progress);
     
-    setTime(elapsedTime);
-    setDistance(newPosition);
-    setVelocity(newVelocity);
+    setTime(progress);
+    setPosition(currentPosition);
     
-    setData(prev => [...prev, {
-      time: Number(elapsedTime.toFixed(2)),
-      position: Number(newPosition.toFixed(2)),
-      velocity: Number(newVelocity.toFixed(2))
-    }]);
+    setData(prevData => {
+      const newData = [...prevData, {
+        time: progress.toFixed(1),
+        position: currentPosition.toFixed(1),
+        velocity: currentVelocity.toFixed(1)
+      }];
+      
+      if (newData.length > 50) newData.shift();
+      return newData;
+    });
     
-    if (newPosition < 1000) {
-      animationRef.current = requestAnimationFrame(animate);
+    const totalDistance = x0 + v0 * progress + (0.5 * a * progress * progress);
+    if (totalDistance < trackLength * laps) {
+      animationFrameId.current = requestAnimationFrame(animate);
     } else {
       setIsRunning(false);
     }
   };
-
+  
   const startSimulation = () => {
-    setIsRunning(true);
-    setData([]);
-    startTimeRef.current = null;
-    animationRef.current = requestAnimationFrame(animate);
-  };
-
-  const resetSimulation = () => {
-    setIsRunning(false);
-    setTime(0);
-    setDistance(x0);
-    setVelocity(v0);
-    setData([]);
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
+    if (!isRunning) {
+      setIsRunning(true);
+      startTime.current = null;
+      animationFrameId.current = requestAnimationFrame(animate);
     }
   };
-
+  
+  const stopSimulation = () => {
+    setIsRunning(false);
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+    }
+  };
+  
+  const resetSimulation = () => {
+    stopSimulation();
+    setTime(0);
+    setPosition(x0);
+    setData([]);
+  };
+  
+  useEffect(() => {
+    return () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    };
+  }, []);
+  
+  const getCarPosition = () => {
+    const normalizedPosition = position / trackLength;
+    const angle = normalizedPosition * 2 * Math.PI;
+    const radius = 150;
+    const centerX = 200;
+    const centerY = 200;
+    
+    return {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle)
+    };
+  };
+  
+  const carPosition = getCarPosition();
+  
   return (
-    <div className="p-6 bg-white rounded-lg shadow-lg max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-center">Simulador de Movimento Uniformemente Variado</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Controles */}
-        <div className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h2 className="text-lg font-semibold mb-4 flex items-center">
-              <Info className="mr-2" size={20} />
-              Parâmetros
-            </h2>
+    <div className="w-full max-w-7xl mx-auto p-4">
+      <div className="grid grid-cols-2 gap-6">
+        {/* Coluna da Esquerda - Controles e Equação */}
+        <div className="space-y-6">
+          {/* Equação e Controles */}
+          <Card className="p-6">
+            <div className="text-2xl font-bold text-center mb-6">
+              X = {x0} + {v0}t + ({a}t²)/2
+            </div>
             
             <div className="space-y-4">
               <div>
-                <label className="flex items-center mb-2">
-                  <Ruler className="mr-2" size={16} />
-                  Posição Inicial (X₀): {x0} m
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={x0}
-                  onChange={(e) => setX0(Number(e.target.value))}
-                  className="w-full"
-                  disabled={isRunning}
+                <label className="block mb-2">Posição Inicial (X₀): {x0} m</label>
+                <Slider
+                  value={[x0]}
+                  onValueChange={(value) => setX0(value[0])}
+                  min={0}
+                  max={100}
+                  step={1}
                 />
               </div>
               
               <div>
-                <label className="flex items-center mb-2">
-                  <ArrowRightCircle className="mr-2" size={16} />
-                  Velocidade Inicial (V₀): {v0} m/s
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  value={v0}
-                  onChange={(e) => setV0(Number(e.target.value))}
-                  className="w-full"
-                  disabled={isRunning}
+                <label className="block mb-2">Velocidade Inicial (V₀): {v0} m/s</label>
+                <Slider
+                  value={[v0]}
+                  onValueChange={(value) => setV0(value[0])}
+                  min={0}
+                  max={50}
+                  step={1}
                 />
               </div>
               
               <div>
-                <label className="flex items-center mb-2">
-                  <BarChart className="mr-2" size={16} />
-                  Aceleração (a): {a} m/s²
-                </label>
-                <input
-                  type="range"
-                  min="-10"
-                  max="10"
-                  step="0.1"
-                  value={a}
-                  onChange={(e) => setA(Number(e.target.value))}
-                  className="w-full"
-                  disabled={isRunning}
+                <label className="block mb-2">Aceleração (a): {a} m/s²</label>
+                <Slider
+                  value={[a]}
+                  onValueChange={(value) => setA(value[0])}
+                  min={-10}
+                  max={10}
+                  step={0.5}
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-2">Número de Voltas: {laps}</label>
+                <Slider
+                  value={[laps]}
+                  onValueChange={(value) => setLaps(value[0])}
+                  min={1}
+                  max={10}
+                  step={1}
                 />
               </div>
             </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <button
+          </Card>
+
+          {/* Controles de Simulação */}
+          <div className="flex justify-center gap-4">
+            <Button
               onClick={startSimulation}
               disabled={isRunning}
-              className="flex-1 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50 flex items-center justify-center"
+              className="flex items-center gap-2"
             >
-              <ArrowRightCircle className="mr-2" size={16} />
-              Iniciar
-            </button>
-            <button
+              <PlayCircle className="w-4 h-4" />
+              Start
+            </Button>
+            
+            <Button
+              onClick={stopSimulation}
+              disabled={!isRunning}
+              className="flex items-center gap-2"
+            >
+              <StopCircle className="w-4 h-4" />
+              Stop
+            </Button>
+            
+            <Button
               onClick={resetSimulation}
-              className="flex-1 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex items-center justify-center"
+              className="flex items-center gap-2"
             >
-              <RefreshCcw className="mr-2" size={16} />
-              Resetar
-            </button>
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </Button>
           </div>
+
+          {/* Informações em Tempo Real */}
+          <Card className="p-6">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <h3 className="font-semibold">Tempo</h3>
+                <p>{time.toFixed(1)} s</p>
+              </div>
+              <div>
+                <h3 className="font-semibold">Posição</h3>
+                <p>{position.toFixed(1)} m</p>
+              </div>
+              <div>
+                <h3 className="font-semibold">Velocidade</h3>
+                <p>{calculateVelocity(time).toFixed(1)} m/s</p>
+              </div>
+            </div>
+          </Card>
         </div>
-        
-        {/* Visualização */}
-        <div className="md:col-span-2">
-          <div className="flex justify-center mb-4 gap-2">
-            <button
-              onClick={() => setView('track')}
-              className={`px-4 py-2 rounded ${view === 'track' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              Pista
-            </button>
-            <button
-              onClick={() => setView('position')}
-              className={`px-4 py-2 rounded ${view === 'position' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              Posição
-            </button>
-            <button
-              onClick={() => setView('velocity')}
-              className={`px-4 py-2 rounded ${view === 'velocity' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              Velocidade
-            </button>
-          </div>
-          
-          {view === 'track' ? (
-            <canvas
-              ref={canvasRef}
-              width="400"
-              height="300"
-              className="border border-gray-300 rounded-lg mx-auto"
-            />
-          ) : (
-            <div className="h-64">
-              <ResponsiveContainer>
-                <LineChart data={data}>
+
+        {/* Coluna da Direita - Pista e Gráficos */}
+        <div className="space-y-6">
+          {/* Pista e Carro */}
+          <Card className="p-6">
+            <div className="relative w-400 h-400">
+              <svg width="400" height="400">
+                <ellipse
+                  cx="200"
+                  cy="200"
+                  rx="150"
+                  ry="150"
+                  fill="none"
+                  stroke="#333"
+                  strokeWidth="20"
+                />
+                {/* Carro */}
+                <circle
+                  cx={carPosition.x}
+                  cy={carPosition.y}
+                  r="10"
+                  fill="red"
+                />
+              </svg>
+            </div>
+          </Card>
+
+          {/* Gráficos */}
+          <Card className="p-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Posição vs Tempo</h3>
+                <LineChart width={400} height={150} data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="time" />
                   <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey={view === 'position' ? 'position' : 'velocity'}
-                    stroke={view === 'position' ? '#3b82f6' : '#10b981'}
-                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="position" stroke="#8884d8" />
                 </LineChart>
-              </ResponsiveContainer>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Velocidade vs Tempo</h3>
+                <LineChart width={400} height={150} data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Legend />
+                  <Line type="monotone" dataKey="velocity" stroke="#82ca9d" />
+                </LineChart>
+              </div>
             </div>
-          )}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="font-mono text-lg font-bold mb-2">Equação do Movimento</p>
-              <p>X = {x0} + {v0}t + ½({a})t²</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="font-mono text-lg font-bold mb-2">Valores Atuais</p>
-              <p>Tempo: {time.toFixed(2)} s</p>
-              <p>Posição: {distance.toFixed(2)} m</p>
-              <p>Velocidade: {velocity.toFixed(2)} m/s</p>
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>
   );
 };
+
 
 export default MotionSimulator;
